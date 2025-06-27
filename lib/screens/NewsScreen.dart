@@ -13,13 +13,8 @@ class _NewsScreenState extends State<NewsScreen> {
   int _navIndex = 0;
 
   void _onNavTapped(int index) {
-    setState(() {
-      _navIndex = index;
-    });
+    setState(() => _navIndex = index);
     switch (index) {
-      case 0:
-        // Already here
-        break;
       case 1:
         Navigator.pushReplacementNamed(context, '/select-course');
         break;
@@ -31,73 +26,111 @@ class _NewsScreenState extends State<NewsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: const TheraAppBar(),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      appBar: const TheraAppBar(title: "ข่าวสาร"),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
         children: [
-          const SizedBox(height: 16),
-          const Text(
-            'Announcement',
+          const SizedBox(height: 8),
+          Text(
+            'ประกาศสำคัญ',
             style: TextStyle(
-              fontSize: 24,
+              fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1F4E79),
+              color: theme.primaryColor,
             ),
           ),
-          const Divider(thickness: 1),
           const SizedBox(height: 8),
+          const Divider(thickness: 1.5),
 
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Card(
-              elevation: 6,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Image.asset(
-                    'assets/picture/therapy_news.png',
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                  ),
-                  Container(
-                    color: Colors.grey[800],
-                    padding: const EdgeInsets.all(8),
-                    child: const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Specialist’s Advice on Physical Therapy',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Dr. Somkid Saetae, 18 Jul 2025',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          const SizedBox(height: 16),
+
+          _buildNewsCard(
+            imagePath: 'assets/picture/therapy_news.png',
+            title: 'คำแนะนำจากผู้เชี่ยวชาญด้านกายภาพ',
+            date: '18 กรกฎาคม 2025',
+            author: 'นพ. สมคิด แซ่แต้',
+          ),
+
+          const SizedBox(height: 24),
+
+          _buildNewsCard(
+            imagePath: 'assets/picture/therapy_news.png',
+            title: 'กิจกรรมฟื้นฟูสำหรับผู้สูงอายุประจำสัปดาห์',
+            date: '16 กรกฎาคม 2025',
+            author: 'ศูนย์ฟื้นฟูสุขภาพ',
           ),
         ],
       ),
       bottomNavigationBar: TheraBottomNav(
         currentIndex: _navIndex,
         onTap: _onNavTapped,
+      ),
+    );
+  }
+
+  Widget _buildNewsCard({
+    required String imagePath,
+    required String title,
+    required String date,
+    required String author,
+  }) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 6,
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          Stack(
+            children: [
+              Image.asset(
+                imagePath,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: 180,
+              ),
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.black.withOpacity(0.7),
+                        Colors.black.withOpacity(0.2)
+                      ],
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                    ),
+                  ),
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      shadows: [Shadow(blurRadius: 2, color: Colors.black)],
+                    ),
+                  ),
+                ),
+              )
+            ],
+          ),
+          Container(
+            padding: const EdgeInsets.all(12),
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '$author • $date',
+              style: const TextStyle(
+                fontSize: 13,
+                color: Colors.black54,
+              ),
+            ),
+          )
+        ],
       ),
     );
   }

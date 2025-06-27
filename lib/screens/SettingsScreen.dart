@@ -135,28 +135,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
               padding: const EdgeInsets.symmetric(vertical: 10),
               decoration: BoxDecoration(
                 gradient: isSelected
-                    ? LinearGradient(colors: [Colors.orange.shade200, Colors.deepOrange.shade400])
+                    ? const LinearGradient(
+                        colors: [Color(0xFF64A6D3), Color(0xFF205781)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
                     : null,
-                color: isToday && !isSelected ? Colors.orange.shade100 : Colors.white,
-                borderRadius: BorderRadius.circular(14),
+                color: isToday && !isSelected ? const Color(0xFFB3D3E6) : Colors.white,
+                borderRadius: BorderRadius.circular(16),
                 boxShadow: [
-                  if (isSelected || isToday)
-                    BoxShadow(color: Colors.orange.shade200, blurRadius: 6, offset: const Offset(0, 3))
+                  if (isSelected)
+                    const BoxShadow(
+                      color: Color(0x4D205781),
+                      blurRadius: 12,
+                      spreadRadius: 1,
+                      offset: Offset(0, 4),
+                    )
+                  else if (isToday)
+                    const BoxShadow(
+                      color: Color(0x33205781),
+                      blurRadius: 8,
+                      offset: Offset(0, 3),
+                    )
                 ],
                 border: Border.all(
-                  color: isSelected ? Colors.deepOrange : Colors.grey.shade300,
+                  color: isSelected ? const Color(0xFF205781) : Colors.grey.shade300,
                   width: isSelected ? 2 : 1,
                 ),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(DateFormat.E().format(day), style: const TextStyle(fontSize: 14)),
-                  Text('${day.day}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text(DateFormat.E('th_TH').format(day),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected ? Colors.white : Colors.black87,
+                      )),
+                  Text('${day.day}',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? Colors.white : Colors.black,
+                      )),
                   if (hasCourse)
                     const Padding(
                       padding: EdgeInsets.only(top: 4),
-                      child: CircleAvatar(radius: 3, backgroundColor: Colors.green),
+                      child: CircleAvatar(radius: 3, backgroundColor: Color(0xFF205781)),
                     )
                 ],
               ),
@@ -173,34 +198,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
       lastDay: DateTime.utc(2026, 1, 1),
       focusedDay: _focusedDay,
       selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-      onDaySelected: (selected, focused) async {
+      onDaySelected: (selectedDay, focusedDay) {
         setState(() {
-          _selectedDay = selected;
-          _focusedDay = focused;
+          _selectedDay = selectedDay;
+          _focusedDay = focusedDay;
         });
-        await _loadCoursesForDay(selected);
+        _loadCoursesForDay(selectedDay);
       },
       calendarFormat: CalendarFormat.month,
-      headerStyle: const HeaderStyle(titleCentered: true, formatButtonVisible: false),
-      calendarStyle: CalendarStyle(
-        todayDecoration: BoxDecoration(color: Colors.orange.shade300, shape: BoxShape.circle),
-        selectedDecoration: BoxDecoration(color: Colors.deepOrange, shape: BoxShape.circle),
-        weekendTextStyle: const TextStyle(color: Colors.redAccent),
+      headerStyle: const HeaderStyle(
+        titleCentered: true,
+        formatButtonVisible: false,
       ),
-      calendarBuilders: CalendarBuilders(
-        defaultBuilder: (context, day, _) {
-          final isMarked = _highlightedDates.any((d) => isSameDay(d, day));
-          return Container(
-            margin: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: isMarked ? Colors.blue : null,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text('${day.day}', style: TextStyle(color: isMarked ? Colors.white : null)),
-            ),
-          );
-        },
+      calendarStyle: CalendarStyle(
+        todayDecoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF64A6D3), Color(0xFF205781)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          shape: BoxShape.circle,
+        ),
+        todayTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        selectedDecoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF64A6D3), Color(0xFF205781)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          shape: BoxShape.circle,
+        ),
+        selectedTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        weekendTextStyle: const TextStyle(color: Colors.redAccent),
       ),
       locale: 'th_TH',
     );
@@ -208,14 +237,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildDayCourseList() {
     final d = _selectedDay ?? DateTime.now();
+    final formattedDate = DateFormat("d MMMM", "th_TH").format(d);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.only(top: 16, bottom: 8),
-          child: Text(
-            isSameDay(d, DateTime.now()) ? 'วันนี้' : 'วันที่ ${d.day}',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          child: Row(
+            children: [
+              Icon(
+                isSameDay(d, DateTime.now()) ? LucideIcons.sun : LucideIcons.calendar,
+                color: Theme.of(context).primaryColor,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                isSameDay(d, DateTime.now()) ? 'วันนี้ ($formattedDate)' : 'วันที่ $formattedDate',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).primaryColor,
+                ),
+              ),
+            ],
           ),
         ),
         ..._scheduledCourses.map((e) {
@@ -243,38 +287,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           );
         }),
-        if (_showCalendar)
-          Align(
-            alignment: Alignment.centerRight,
-            child: ElevatedButton.icon(
-              icon: const Icon(LucideIcons.plusCircle),
-              label: const Text('เพิ่มกิจกรรม'),
-              onPressed: () async {
-                final selectedCourse = await _selectCourseDialog();
-                if (selectedCourse != null) {
-                  final selectedTime = await _selectTimeDialog();
-                  if (selectedTime != null) {
-                    final scheduled = DateTime(
-                      d.year,
-                      d.month,
-                      d.day,
-                      selectedTime.hour,
-                      selectedTime.minute,
-                    );
-                    if (scheduled.isBefore(DateTime.now())) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('⏰ กรุณาเลือกเวลาที่อยู่ในอนาคต')));
-                      return;
-                    }
-                    await CourseEventService.scheduleCourseEvent(selectedCourse, scheduled);
-                    await CourseEventService.logCourse(selectedCourse, scheduled);
-                    setState(() => _highlightedDates.add(scheduled));
-                    await _loadCoursesForDay(d);
-                  }
-                }
-              },
-            ),
-          )
       ],
     );
   }
@@ -309,6 +321,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildSafetySettings() {
+    return Card(
+      margin: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(LucideIcons.alertCircle, color: Colors.redAccent),
+            title: const Text("ความปลอดภัย", style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          SwitchListTile(
+            title: const Text("เปิดระบบโทรฉุกเฉินเมื่อเกิดการล้ม"),
+            subtitle: const Text("ระบบจะโทรไปยังเบอร์ที่ตั้งไว้ หากตรวจพบว่าคุณล้ม"),
+            value: UserSettings.enableFallDetection,
+            onChanged: (val) async {
+              setState(() => UserSettings.enableFallDetection = val);
+              await UserSettings.saveSettings();
+            },
+          ),
+          ListTile(
+            leading: const Icon(LucideIcons.phone, color: Colors.red),
+            title: const Text("เบอร์ฉุกเฉิน"),
+            subtitle: Text(UserSettings.emergencyPhone),
+            trailing: IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: () async {
+                final controller = TextEditingController(text: UserSettings.emergencyPhone);
+                final newPhone = await showDialog<String>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text("ตั้งค่าเบอร์ฉุกเฉิน"),
+                    content: TextField(
+                      controller: controller,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(labelText: "เบอร์โทรฉุกเฉิน"),
+                    ),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(context), child: const Text("ยกเลิก")),
+                      TextButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text("บันทึก")),
+                    ],
+                  ),
+                );
+                if (newPhone != null && newPhone.isNotEmpty) {
+                  setState(() => UserSettings.emergencyPhone = newPhone);
+                  await UserSettings.saveSettings();
+                }
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -322,32 +387,102 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('ผู้ใช้งาน', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            Text('🔥 Streak: $_streak วัน', style: const TextStyle(fontSize: 18, color: Colors.orange)),
-            const SizedBox(height: 16),
+            Center(
+              child: Column(
+                children: [
+                  const Text('ผู้ใช้งาน', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                  Text('🔥 Streak: $_streak วัน',
+                      style: TextStyle(fontSize: 18, color: Theme.of(context).primaryColor)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('กิจกรรมรายสัปดาห์', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
                 TextButton(
-                  onPressed: () => showModalBottomSheet(
-                    context: context,
-                    builder: (_) => Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: _buildCalendar(),
-                    ),
-                  ).then((_) => setState(() => _showCalendar = true)),
-                  child: const Text('ปฏิทิน'),
+                  onPressed: () => setState(() => _showCalendar = !_showCalendar),
+                  child: Text(_showCalendar ? 'ซ่อนปฏิทิน' : 'ปฏิทิน'),
                 ),
               ],
             ),
+            const SizedBox(height: 12),
             _buildWeekBar(),
+            if (_showCalendar) _buildCalendar(),
             _buildDayCourseList(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             _buildVoiceSettings(),
+            _buildSafetySettings(),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              icon: const Icon(LucideIcons.plus),
+              label: const Text("เลือกวันที่อยากเพิ่มคอร์ส"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).primaryColor,
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () async {
+                final selectedCourse = await _selectCourseDialog();
+                if (selectedCourse == null) return;
+
+                final selectedDate = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime.now(),
+                  firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                  helpText: 'เลือกวันที่',
+                  cancelText: 'ยกเลิก',
+                  confirmText: 'ยืนยัน',
+                );
+                if (selectedDate == null) return;
+
+                final selectedTime = await _selectTimeDialog();
+                if (selectedTime == null) return;
+
+                final courseDateTime = DateTime(
+                  selectedDate.year,
+                  selectedDate.month,
+                  selectedDate.day,
+                  selectedTime.hour,
+                  selectedTime.minute,
+                );
+
+                await CourseEventService.scheduleCourseEvent(selectedCourse, courseDateTime);
+                setState(() {
+                  _highlightedDates.add(selectedDate);
+                  _selectedDay = selectedDate;
+                  _focusedDay = selectedDate;
+                });
+                await _loadCoursesForDay(selectedDate);
+              },
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              icon: const Icon(LucideIcons.history),
+              label: const Text("ล้างประวัติคำแนะนำ"),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Theme.of(context).primaryColor,
+                side: BorderSide(color: Theme.of(context).primaryColor),
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.remove('suggestion_done');
+                await prefs.remove('suggestion_skip');
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('ล้างประวัติคำแนะนำแล้ว')),
+                );
+              },
+            ),
           ],
         ),
       ),

@@ -15,21 +15,24 @@ import '../evaluators/armcirclesevaluator.dart';
 import '../evaluators/elbowflexionevaluator.dart';
 import '../evaluators/armextensionforwardevaluator.dart';
 import '../evaluators/wallpushupevaluator.dart';
+import '../evaluators/placeholder_evaluator.dart';
+
 
 class PoseEvaluatorService {
   static final Map<String, PoseEvaluator> _evaluators = {
-    'Seated Leg Raise': SeatedLegRaiseEvaluator(),
-    'Standing Knee Flexion': StandingKneeFlexionEvaluator(),
-    'Side Leg Raise': SideLegRaiseEvaluator(),
-    'Heel Raise': HeelRaiseEvaluator(),
-    'Shoulder Rolls': ShoulderRollsEvaluator(),
-    'Shoulder Shrug': ShoulderShrugEvaluator(),
-    'Wall Slide': WallSlideEvaluator(),
-    'Shoulder Abduction': ShoulderAbductionEvaluator(),
-    'Arm Circles': ArmCirclesEvaluator(),
-    'Elbow Flexion': ElbowFlexionEvaluator(),
     'Arm Extension Forward': ArmExtensionForwardEvaluator(),
+    'Shoulder Shrug': ShoulderShrugEvaluator(),
+    'Shoulder Abduction': ShoulderAbductionEvaluator(),
     'Wall Push-Up': WallPushUpEvaluator(),
+
+    'Shoulder Rolls': PlaceholderEvaluator('Shoulder Rolls'),
+    'Arm Circles': PlaceholderEvaluator('Arm Circles'),
+    'Elbow Flexion': PlaceholderEvaluator('Elbow Flexion'),
+    'Wall Slide': PlaceholderEvaluator('Wall Slide'),
+    'Side Leg Raise': PlaceholderEvaluator('Side Leg Raise'),
+    'Seated Leg Raise': PlaceholderEvaluator('Seated Leg Raise'),
+    'Standing Knee Flexion': PlaceholderEvaluator('Standing Knee Flexion'),
+    'Heel Raise': PlaceholderEvaluator('Heel Raise'),
   };
 
   static PoseEvaluator? getEvaluatorByName(String name) {

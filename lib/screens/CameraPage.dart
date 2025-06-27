@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:collection';
 import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
@@ -41,14 +43,14 @@ class _CameraPageState extends State<CameraPage> {
   bool _showTurnSideHint = false;
   bool _hasSpokenTurnHint = false;
 
-  final List<String> encouragements = [
-    "เยี่ยมมากครับ!",
-    "สุดยอดเลย!",
-    "ทำดีมากครับ",
-    "คุณทำได้ดีมาก!",
-    "เก่งมากครับ! สู้ต่อไป"
-  ];
+  bool _isSpeaking = false;
+  DateTime? _lastSpeechTime;
+  Queue<String> _speechQueue = Queue<String>();
+  bool _processingQueue = false;
 
+  final List<String> encouragements = [
+    "เยี่ยมมากครับ!", "สุดยอดเลย!", "ทำดีมากครับ", "คุณทำได้ดีมาก!", "เก่งมากครับ! สู้ต่อไป"
+  ];
   final List<String> encouragementsWhenWrong = [
     "ไม่เป็นไรครับ ลองใหม่อีกครั้งนะครับ",
     "ใกล้แล้วครับ ผมเชื่อว่าคุณทำได้",
@@ -57,6 +59,9 @@ class _CameraPageState extends State<CameraPage> {
   ];
 
   int _lastRepetitionCount = 0;
+  bool _isInFallPose = false;
+  DateTime? _fallStartTime;
+  bool _hasSentEmergency = false;
 
   @override
   void initState() {
@@ -65,34 +70,135 @@ class _CameraPageState extends State<CameraPage> {
   }
 
   Future<void> _initialize() async {
-    final cameras = await availableCameras();
-    final frontCamera = cameras.firstWhere((c) => c.lensDirection == CameraLensDirection.front);
-    _isFrontCamera = true;
+    try {
+      final cameras = await availableCameras();
+      final frontCamera = cameras.firstWhere(
+        (c) => c.lensDirection == CameraLensDirection.front,
+        orElse: () => cameras.first, // Fallback to first camera if no front camera
+      );
+      _isFrontCamera = frontCamera.lensDirection == CameraLensDirection.front;
 
-    _controller = CameraController(frontCamera, ResolutionPreset.medium, enableAudio: false);
-    await _controller!.initialize();
+      _controller = CameraController(
+        frontCamera, 
+        ResolutionPreset.medium, 
+        enableAudio: false
+      );
+      await _controller!.initialize();
 
-    _poseDetector = PoseDetector(
-      options: PoseDetectorOptions(mode: PoseDetectionMode.stream),
-    );
+      _poseDetector = PoseDetector(
+        options: PoseDetectorOptions(mode: PoseDetectionMode.stream),
+      );
 
-    await _tts.setLanguage("th-TH");
-    await _tts.setSpeechRate(0.5);
+      await _initializeTTS();
 
-    await _controller!.startImageStream(_processImage);
-    _startExerciseTimer();
-    setState(() {});
+      if (mounted) {
+        await _controller!.startImageStream(_processImage);
+        _startExerciseTimer();
+        setState(() {});
+      }
+    } catch (e) {
+      debugPrint('Initialization error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Camera initialization failed: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _initializeTTS() async {
+    try {
+      await _tts.setLanguage("th-TH");
+      await _tts.setSpeechRate(0.5);
+      await _tts.setVolume(0.8);
+      await _tts.setPitch(1.0);
+      
+      _tts.setCompletionHandler(() {
+        if (mounted) {
+          _isSpeaking = false;
+          _processNextSpeech();
+        }
+      });
+      
+      _tts.setErrorHandler((msg) {
+        debugPrint('TTS Error: $msg');
+        if (mounted) {
+          _isSpeaking = false;
+          _processNextSpeech();
+        }
+      });
+      
+    } catch (e) {
+      debugPrint('TTS Initialization Error: $e');
+    }
+  }
+
+  Future<void> _speakSafely(String text, {Duration minDelay = const Duration(seconds: 1)}) async {
+    if (text.isEmpty || !mounted) return;
+    
+    final now = DateTime.now();
+    if (_lastSpeechTime != null && now.difference(_lastSpeechTime!) < minDelay) {
+      return;
+    }
+    
+    _speechQueue.add(text);
+    _lastSpeechTime = now;
+    
+    if (!_processingQueue) {
+      _processNextSpeech();
+    }
+  }
+
+  Future<void> _processNextSpeech() async {
+    if (_speechQueue.isEmpty || _processingQueue || !mounted) return;
+    
+    _processingQueue = true;
+    
+    while (_speechQueue.isNotEmpty && mounted) {
+      final text = _speechQueue.removeFirst();
+      
+      if (_isSpeaking) {
+        await _tts.stop();
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+      
+      _isSpeaking = true;
+      
+      try {
+        await _tts.speak(text);
+        while (_isSpeaking && mounted) {
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
+      } catch (e) {
+        debugPrint('Speech Error: $e');
+        _isSpeaking = false;
+      }
+      
+      await Future.delayed(const Duration(milliseconds: 300));
+    }
+    
+    _processingQueue = false;
   }
 
   void _startExerciseTimer() {
     _exerciseTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) return;
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      
       setState(() => _remainingSeconds--);
 
       if (_remainingSeconds <= 0) {
         _exerciseTimer?.cancel();
-        _tts.speak("\uD83C\uDF89 สิ้นสุดการฝึกวันนี้แล้ว ขอบคุณที่ร่วมฝึก");
-        Navigator.pushReplacementNamed(context, '/select-course');
+        _speakSafely("🎉 สิ้นสุดการฝึกวันนี้แล้ว ขอบคุณที่ร่วมฝึก");
+        
+        Timer(const Duration(seconds: 4), () {
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, '/select-course');
+          }
+        });
+        return;
       }
 
       if (_remainingSeconds % 60 == 0 && _remainingSeconds != 0) {
@@ -102,13 +208,16 @@ class _CameraPageState extends State<CameraPage> {
   }
 
   void _startRestPeriod() async {
-    _isResting = true;
-    await _tts.speak("⏸ ถึงเวลาพัก 10 วินาที");
+    if (!mounted) return;
+    
+    setState(() => _isResting = true);
+    _speakSafely("⏸ ถึงเวลาพัก 10 วินาที");
     await _controller?.stopImageStream();
 
     _restTimer = Timer(const Duration(seconds: 10), () async {
-      _isResting = false;
-      await _tts.speak("\uD83D\uDCAA เริ่มฝึกต่อได้เลย");
+      if (!mounted) return;
+      setState(() => _isResting = false);
+      _speakSafely("💪 เริ่มฝึกต่อได้เลย");
       await _controller?.startImageStream(_processImage);
     });
   }
@@ -120,7 +229,7 @@ class _CameraPageState extends State<CameraPage> {
   }
 
   void _processImage(CameraImage image) async {
-    if (_isDetecting || !_controller!.value.isStreamingImages || _isResting) return;
+    if (_isDetecting || !_controller!.value.isStreamingImages || _isResting || !mounted) return;
     _isDetecting = true;
 
     try {
@@ -137,17 +246,20 @@ class _CameraPageState extends State<CameraPage> {
         final points = {for (var lm in landmarks) lm.type: Offset(lm.x, lm.y)};
         final evaluator = PoseEvaluatorService.getEvaluatorByName(widget.courseName);
 
+        _checkFall(points);
+
         if (_shouldShowTurnHint(points)) {
-          if (!_showTurnSideHint) {
+          if (!_showTurnSideHint && mounted) {
             setState(() => _showTurnSideHint = true);
           }
           if (!_hasSpokenTurnHint) {
             _hasSpokenTurnHint = true;
-            await _tts.speak("กรุณาหันตัวด้านข้างให้กล้องมองเห็นท่าชัดเจนขึ้นนะครับ");
+            _speakSafely("กรุณาหันตัวด้านข้างให้กล้องมองเห็นท่าชัดเจนขึ้นนะครับ", 
+                        minDelay: const Duration(seconds: 5));
           }
         } else {
           _hasSpokenTurnHint = false;
-          if (_showTurnSideHint) {
+          if (_showTurnSideHint && mounted) {
             setState(() => _showTurnSideHint = false);
           }
         }
@@ -156,27 +268,51 @@ class _CameraPageState extends State<CameraPage> {
         if (evaluator != null) {
           if (evaluator is RepetitionEvaluator) {
             result = evaluator.update(points);
+
+            final isCorrect = evaluator.evaluate(points);
+            final feedbackText = evaluator.feedback;
+
+            if (!isCorrect && feedbackText.isNotEmpty) {
+              String feedbackMessage = "";
+
+              if (UserSettings.enableTechnicalFeedback) {
+                feedbackMessage = feedbackText;
+              }
+
+              if (UserSettings.enableEncouragement) {
+                final phrase = encouragementsWhenWrong[Random().nextInt(encouragementsWhenWrong.length)];
+                if (feedbackMessage.isNotEmpty) {
+                  feedbackMessage += " $phrase";
+                } else {
+                  feedbackMessage = phrase;
+                }
+              }
+
+              if (feedbackMessage.isNotEmpty) {
+                _speakSafely(feedbackMessage, minDelay: const Duration(seconds: 2));
+              }
+            }
+
             if (evaluator.repetitionCount > _lastRepetitionCount && UserSettings.enableEncouragement) {
               _lastRepetitionCount = evaluator.repetitionCount;
               final phrase = encouragements[Random().nextInt(encouragements.length)];
-              await _tts.speak("$phrase ทำได้ $_lastRepetitionCount ครั้งแล้วครับ");
+              _speakSafely("$phrase ทำได้ $_lastRepetitionCount ครั้งแล้วครับ", minDelay: const Duration(seconds: 2));
             }
-          } else if (!evaluator.evaluate(points)) {
-            result = evaluator.feedback;
-            if (UserSettings.enableTechnicalFeedback) {
-              await _tts.speak(result);
-            }
-            if (UserSettings.enableEncouragement) {
-              final phrase = encouragementsWhenWrong[Random().nextInt(encouragementsWhenWrong.length)];
-              await _tts.speak(phrase);
+
+            if (mounted) {
+              setState(() {
+                _feedbackText = feedbackText;
+              });
             }
           }
         }
 
-        setState(() {
-          _landmarks = landmarks;
-          _feedbackText = result;
-        });
+        if (mounted) {
+          setState(() {
+            _landmarks = landmarks;
+            _feedbackText = result;
+          });
+        }
       }
     } catch (e) {
       debugPrint('❌ Detection error: $e');
@@ -202,11 +338,90 @@ class _CameraPageState extends State<CameraPage> {
     return InputImage.fromBytes(bytes: bytes, metadata: metadata);
   }
 
-  void _stopSession() {
+  void _checkFall(Map<PoseLandmarkType, Offset> points) {
+    final head = points[PoseLandmarkType.nose];
+    final leftHip = points[PoseLandmarkType.leftHip];
+    final rightHip = points[PoseLandmarkType.rightHip];
+    final leftKnee = points[PoseLandmarkType.leftKnee];
+    final rightKnee = points[PoseLandmarkType.rightKnee];
+
+    if ([head, leftHip, rightHip, leftKnee, rightKnee].any((p) => p == null)) return;
+
+    final hipY = (leftHip!.dy + rightHip!.dy) / 2;
+    final kneeY = (leftKnee!.dy + rightKnee!.dy) / 2;
+    final headY = head!.dy;
+
+    final isHeadTooLow = headY > hipY + 100;
+    final isHipTooLow = hipY > kneeY + 60;
+    final now = DateTime.now();
+
+    if (isHeadTooLow && isHipTooLow) {
+      if (!_isInFallPose) {
+        _isInFallPose = true;
+        _fallStartTime = now;
+      } else {
+        final duration = now.difference(_fallStartTime!);
+        if (duration > const Duration(seconds: 5) && !_hasSentEmergency) {
+          _hasSentEmergency = true;
+          _speakSafely("🚨 ตรวจพบว่าคุณอาจล้มลง และอยู่ในท่าล้มเป็นเวลานาน กำลังติดต่อหน่วยฉุกเฉิน", 
+                      minDelay: const Duration(seconds: 2));
+          _triggerEmergencyCall();
+        }
+      }
+    } else {
+      _isInFallPose = false;
+      _fallStartTime = null;
+      _hasSentEmergency = false;
+    }
+  }
+
+  Future<void> _triggerEmergencyCall() async {
+    if (!UserSettings.enableFallDetection) return;
+
+    final String phoneNumber = UserSettings.emergencyPhone;
+    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+
+    if (await canLaunchUrl(phoneUri)) {
+      await launchUrl(phoneUri);
+    } else {
+      debugPrint('❌ ไม่สามารถโทรออกได้: $phoneUri');
+    }
+  }
+
+  void _stopSession() async {
     _exerciseTimer?.cancel();
     _restTimer?.cancel();
-    _controller?.stopImageStream();
-    Navigator.pushReplacementNamed(context, '/select-course');
+    await _controller?.stopImageStream();
+    
+    _speakSafely("การฝึกสิ้นสุดแล้ว");
+    
+    Timer(const Duration(seconds: 2), () {
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/select-course');
+      }
+    });
+  }
+
+  void _testVoice() {
+    _speakSafely("ระบบเสียงทำงานเรียบร้อยแล้ว ขณะนี้เป็นภาษาไทย");
+  }
+
+  Widget _glassContainer({required Widget child, EdgeInsets? padding}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: padding ?? const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.4),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withOpacity(0.2)),
+          ),
+          child: child,
+        ),
+      ),
+    );
   }
 
   @override
@@ -222,98 +437,179 @@ class _CameraPageState extends State<CameraPage> {
   @override
   Widget build(BuildContext context) {
     if (_controller == null || !_controller!.value.isInitialized) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('กำลังเปิดกล้อง...', style: TextStyle(fontSize: 16)),
+            ],
+          ),
+        ),
+      );
     }
 
     final size = MediaQuery.of(context).size;
     final previewSize = _controller!.value.previewSize!;
-    final scale = size.aspectRatio * previewSize.aspectRatio;
+    final screenRatio = size.width / size.height;
+    final cameraRatio = previewSize.height / previewSize.width;
+    final cameraScale = cameraRatio / screenRatio;
 
     return Scaffold(
-      appBar: AppBar(title: Text('ฝึก: ${widget.courseName}')),
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          Transform.scale(
-            scale: scale < 1 ? 1 / scale : scale,
+      backgroundColor: Colors.black,
+      body: Stack(fit: StackFit.expand, children: [
+        // full-screen zoomed & cropped camera
+        ClipRect(
+          child: Transform.scale(
+            scale: cameraScale,
             child: Center(child: CameraPreview(_controller!)),
           ),
-          if (_landmarks.isNotEmpty)
-            CustomPaint(
-              painter: PosePainter.fromLandmarks(
-                _landmarks,
-                previewSize.width,
-                previewSize.height,
-                isFrontCamera: _isFrontCamera,
+        ),
+
+        // pose overlay
+        if (_landmarks.isNotEmpty)
+          CustomPaint(
+            painter: PosePainter.fromLandmarks(
+              _landmarks,
+              previewSize.width,
+              previewSize.height,
+              isFrontCamera: _isFrontCamera,
+            ),
+          ),
+
+        // course badge top-left
+        Positioned(
+          top: 50,
+          left: 16,
+          child: _glassContainer(
+            child: Text(
+              widget.courseName,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          if (_feedbackText != null)
-            Positioned(
-              bottom: 90,
-              left: 16,
-              right: 16,
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.redAccent.withOpacity(0.85),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  _feedbackText!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white, fontSize: 18),
-                ),
-              ),
-            ),
-          if (_showTurnSideHint)
-            Positioned(
-              top: 100,
-              left: 20,
-              right: 20,
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  "\uD83D\uDCF8 กรุณาหันตัวด้านข้างให้กล้องเห็นได้ชัดเจน",
-                  style: TextStyle(color: Colors.white, fontSize: 16),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
+          ),
+        ),
+
+        // turn-side hint
+        if (_showTurnSideHint)
           Positioned(
-            bottom: 20,
-            left: 16,
-            right: 16,
-            child: Column(
-              children: [
-                Text(
-                  _isResting ? '⏸ กำลังพัก...' : '⏱ เหลือเวลา: $_remainingSeconds วินาที',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-                  textAlign: TextAlign.center,
+            top: 90,
+            left: 20,
+            right: 20,
+            child: _glassContainer(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.rotate_right, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      "กรุณาหันตัวด้านข้างให้กล้องเห็นได้ชัดเจน",
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+        // feedback text
+        if (_feedbackText != null && _feedbackText!.isNotEmpty)
+          Positioned(
+            bottom: 130,
+            left: 24,
+            right: 24,
+            child: _glassContainer(
+              child: Text(
+                _feedbackText!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
                 ),
-                const SizedBox(height: 8),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.stop_circle_outlined),
-                  label: const Text("หยุดการฝึก"),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                  onPressed: _stopSession,
+              ),
+            ),
+          ),
+
+        // bottom controls: timer, stop, test voice
+        Positioned(
+          bottom: 20,
+          left: 16,
+          right: 16,
+          child: _glassContainer(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      _isResting ? Icons.pause_circle : Icons.timer,
+                      color: _isResting ? Colors.orange : Colors.white,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _isResting
+                          ? 'กำลังพัก...'
+                          : 'เหลือเวลา: ${(_remainingSeconds ~/ 60).toString().padLeft(2, '0')}:${(_remainingSeconds % 60).toString().padLeft(2, '0')}', 
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.stop_circle_outlined, size: 20),
+                      label: const Text("หยุดการฝึก"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: _stopSession,
+                    ),
+                    ElevatedButton.icon(
+                      icon: Icon(
+                        _isSpeaking ? Icons.volume_off : Icons.volume_up,
+                        size: 20,
+                      ),
+                      label: Text(_isSpeaking ? "กำลังพูด" : "ทดสอบเสียง"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.deepOrangeAccent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: _isSpeaking ? null : _testVoice,
+                    ),
+                  ],  
                 ),
               ],
             ),
           ),
-          Positioned(
-            top: 50,
-            right: 16,
-            child: ElevatedButton(
-              onPressed: () => _tts.speak("ระบบเสียงทำงานเรียบร้อยแล้ว"),
-              child: const Text("ทดสอบเสียง"),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ]),
     );
   }
 }

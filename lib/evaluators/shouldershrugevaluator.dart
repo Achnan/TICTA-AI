@@ -2,32 +2,36 @@ import 'dart:ui';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'evaluator_base.dart';
 
-class ShoulderShrugEvaluator extends PoseEvaluator {
+class ShoulderShrugEvaluator extends RepetitionEvaluator {
+  int _state = 0;
+  String _feedback = '';
+
   @override
-  String get name => 'Shoulder Shrug';
+  String get name => "Shoulder Shrug";
 
-  int repetitions = 0;
-  String stage = 'down';
-
-  final double thresholdUp = 30;
-  final double thresholdDown = 50;
+  @override
+  String get feedback => _feedback;
 
   @override
   String? update(Map<PoseLandmarkType, Offset> points) {
-    final shoulder = points[PoseLandmarkType.leftShoulder];
-    final ear = points[PoseLandmarkType.leftEar];
+    final leftShoulder = points[PoseLandmarkType.leftShoulder];
+    final rightShoulder = points[PoseLandmarkType.rightShoulder];
+    final leftHip = points[PoseLandmarkType.leftHip];
+    final rightHip = points[PoseLandmarkType.rightHip];
 
-    if (shoulder == null || ear == null) return null;
+    if (leftShoulder == null || rightShoulder == null || leftHip == null || rightHip == null) return null;
 
-    final deltaY = shoulder.dy - ear.dy;
+    final leftDy = leftHip.dy - leftShoulder.dy;
+    final rightDy = rightHip.dy - rightShoulder.dy;
+    final avgDy = (leftDy + rightDy) / 2;
 
-    if (stage == 'down' && deltaY < thresholdUp) {
-      stage = 'up';
-      repetitions++;
-      return '✅ ยกไหล่ขึ้นสำเร็จ (ครั้งที่ $repetitions)';
-    } else if (stage == 'up' && deltaY > thresholdDown) {
-      stage = 'down';
-      return '⬇️ ลดไหล่ลง';
+    if (_state == 0 && avgDy > 60) {
+      _state = 1;
+    } else if (_state == 1 && avgDy < 40) {
+      _state = 0;
+      repetitionCount++;
+      _feedback = "ยกไหล่ครั้งที่ $repetitionCount";
+      return _feedback;
     }
 
     return null;
@@ -35,10 +39,34 @@ class ShoulderShrugEvaluator extends PoseEvaluator {
 
   @override
   bool evaluate(Map<PoseLandmarkType, Offset> points) {
-    // ไม่ใช้ระบบ evaluate ธรรมดาในการจับท่าครั้งเดียว
-    return true;
-  }
+    final leftShoulder = points[PoseLandmarkType.leftShoulder];
+    final rightShoulder = points[PoseLandmarkType.rightShoulder];
+    final leftHip = points[PoseLandmarkType.leftHip];
+    final rightHip = points[PoseLandmarkType.rightHip];
 
-  @override
-  String get feedback => 'ยกไหล่ขึ้นสูงกว่าปกติ';
+    if (leftShoulder == null || rightShoulder == null || leftHip == null || rightHip == null) {
+      _feedback = "❗ กรุณาอยู่ในตำแหน่งที่กล้องเห็นได้ชัดเจน";
+      return false;
+    }
+
+    final leftDy = leftHip.dy - leftShoulder.dy;
+    final rightDy = rightHip.dy - rightShoulder.dy;
+    final avgDy = (leftDy + rightDy) / 2;
+    final shoulderDiff = (leftDy - rightDy).abs();
+
+    if (avgDy >= 60 && shoulderDiff < 20) {
+      _feedback = "✅ ยกไหล่ได้ดีมากแล้วครับ";
+      return true;
+    }
+
+    if (avgDy < 40) {
+      _feedback = "❗ กรุณายกไหล่ขึ้นอีกนิดครับ";
+    } else if (shoulderDiff >= 20) {
+      _feedback = "❗ ยกไหล่ให้เท่ากันทั้งสองข้างครับ";
+    } else {
+      _feedback = "❗ ลองยืดตัวตรงขึ้นนิดนึงครับ";
+    }
+
+    return false;
+  }
 }

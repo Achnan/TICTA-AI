@@ -6,34 +6,112 @@ import 'package:theraphy_flutter/main.dart';
 
 class CourseEventService {
   static final List<Map<String, dynamic>> courseList = [
-  {
-    'name': 'กายภาพบำบัดขา',
-    'exercises': [
-      {'title': 'นั่งเหยียดขา (Seated Leg Raise)', 'desc': 'เสริมกล้ามต้นขา', 'reps': 'ข้างละ 10', 'duration': '~3 นาที'},
-      {'title': 'ยืนงอเข่า (Standing Knee Flexion)', 'desc': 'งอกล้ามเนื้อหลังขา', 'reps': 'ข้างละ 10', 'duration': '~3 นาที'},
-      {'title': 'ยกขาออกด้านข้าง (Side Leg Raise)', 'desc': 'กล้ามเนื้อสะโพก', 'reps': 'ข้างละ 10', 'duration': '~2 นาที'},
-      {'title': 'เขย่งส้นเท้า (Heel Raise)', 'desc': 'เสริมกล้ามเนื้อน่อง', 'reps': '10–15 ครั้ง', 'duration': '~2 นาที'},
-    ]
-  },
-  {
-    'name': 'กายภาพบำบัดไหล่',
-    'exercises': [
-      {'title': 'หมุนไหล่ (Shoulder Rolls)', 'desc': 'ผ่อนคลายข้อไหล่', 'reps': '10 รอบ หน้า-หลัง', 'duration': '~2 นาที'},
-      {'title': 'ยกไหล่ (Shoulder Shrug)', 'desc': 'ลดอาการตึงที่ไหล่', 'reps': '10 ครั้ง', 'duration': '~2 นาที'},
-      {'title': 'เลื่อนแขนบนผนัง (Wall Slide)', 'desc': 'เพิ่มการเคลื่อนไหวของข้อไหล่', 'reps': '10 ครั้ง', 'duration': '~3 นาที'},
-      {'title': 'กางแขนด้านข้าง (Shoulder Abduction)', 'desc': 'กางแขนออกข้าง เสริมไหล่', 'reps': '10 ครั้ง', 'duration': '~3 นาที'},
-    ]
-  },
-  {
-    'name': 'กายภาพบำบัดแขน',
-    'exercises': [
-      {'title': 'หมุนแขนเป็นวง (Arm Circles)', 'desc': 'เพิ่มความยืดหยุ่นหัวไหล่', 'reps': '10 รอบ หน้า–หลัง', 'duration': '~2 นาที'},
-      {'title': 'งอข้อศอก (Elbow Flexion)', 'desc': 'ฝึกงอ-เหยียดข้อศอก', 'reps': 'ข้างละ 10 ครั้ง', 'duration': '~2 นาที'},
-      {'title': 'เหยียดแขนขึ้นหน้า (Arm Extension Forward)', 'desc': 'เหยียดแขนหน้า-ชูขึ้น', 'reps': '10 ครั้ง', 'duration': '~2 นาที'},
-      {'title': 'วิดพื้นกับผนัง (Wall Push-Up)', 'desc': 'เสริมแรงต้นแขน/หัวไหล่', 'reps': '10–15 ครั้ง', 'duration': '~3 นาที'},
-    ]
-  },
-];
+    {
+      'name': 'กายภาพบำบัดผู้สูงอายุ',
+      'exercises': [
+        {
+          'title': 'นั่งเหยียดขา (Seated Leg Raise)',
+          'slug': 'seated_leg_raise',
+          'desc': 'เสริมกล้ามต้นขา',
+          'reps': 'ข้างละ 10',
+          'duration': '~3 นาที'
+        },
+        {
+          'title': 'เขย่งส้นเท้า (Heel Raise)',
+          'slug': 'heel_raise',
+          'desc': 'เสริมกล้ามเนื้อน่อง',
+          'reps': '10–15 ครั้ง',
+          'duration': '~2 นาที'
+        },
+        {
+          'title': 'หมุนไหล่ (Shoulder Rolls)',
+          'slug': 'shoulder_rolls',
+          'desc': 'ผ่อนคลายข้อไหล่',
+          'reps': '10 รอบ หน้า-หลัง',
+          'duration': '~2 นาที'
+        },
+        {
+          'title': 'ยกไหล่ (Shoulder Shrug)',
+          'slug': 'shoulder_shrug',
+          'desc': 'ลดอาการตึงที่ไหล่',
+          'reps': '10 ครั้ง',
+          'duration': '~2 นาที'
+        },
+      ]
+    },
+    {
+      'name': 'กายภาพบำบัดระบบกระดูกและกล้ามเนื้อ',
+      'exercises': [
+        {
+          'title': 'เลื่อนแขนบนผนัง (Wall Slide)',
+          'slug': 'wall_slide',
+          'desc': 'เพิ่มการเคลื่อนไหวของข้อไหล่',
+          'reps': '10 ครั้ง',
+          'duration': '~3 นาที'
+        },
+        {
+          'title': 'วิดพื้นกับผนัง (Wall Push-Up)',
+          'slug': 'wall_push_up',
+          'desc': 'เสริมแรงต้นแขน/หัวไหล่',
+          'reps': '10–15 ครั้ง',
+          'duration': '~3 นาที'
+        },
+        {
+          'title': 'กางแขนด้านข้าง (Shoulder Abduction)',
+          'slug': 'shoulder_abduction',
+          'desc': 'กางแขนออกข้าง เสริมไหล่',
+          'reps': '10 ครั้ง',
+          'duration': '~3 นาที'
+        },
+      ]
+    },
+    {
+      'name': 'กายภาพบำบัดระบบประสาท',
+      'exercises': [
+        {
+          'title': 'ยืนงอเข่า (Standing Knee Flexion)',
+          'slug': 'standing_knee_flexion',
+          'desc': 'งอกล้ามเนื้อหลังขา',
+          'reps': 'ข้างละ 10',
+          'duration': '~3 นาที'
+        },
+        {
+          'title': 'ยกขาออกด้านข้าง (Side Leg Raise)',
+          'slug': 'side_leg_raise',
+          'desc': 'กล้ามเนื้อสะโพก',
+          'reps': 'ข้างละ 10',
+          'duration': '~2 นาที'
+        },
+        {
+          'title': 'หมุนแขนเป็นวง (Arm Circles)',
+          'slug': 'arm_circles',
+          'desc': 'เพิ่มความยืดหยุ่นหัวไหล่',
+          'reps': '10 รอบ หน้า–หลัง',
+          'duration': '~2 นาที'
+        },
+      ]
+    },
+    {
+      'name': 'กายภาพบำบัดบาดเจ็บทางการกีฬา',
+      'exercises': [
+        {
+          'title': 'งอข้อศอก (Elbow Flexion)',
+          'slug': 'elbow_flexion',
+          'desc': 'ฝึกงอ-เหยียดข้อศอก',
+          'reps': 'ข้างละ 10 ครั้ง',
+          'duration': '~2 นาที'
+        },
+        {
+          'title': 'เหยียดแขนขึ้นหน้า (Arm Extension Forward)',
+          'slug': 'arm_extension_forward',
+          'desc': 'เหยียดแขนหน้า-ชูขึ้น',
+          'reps': '10 ครั้ง',
+          'duration': '~2 นาที'
+        },
+      ]
+    },
+  ];
+
 
 
   static final List<DateTime> _scheduledDates = [];

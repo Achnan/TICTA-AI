@@ -10,6 +10,5 @@ abstract class PoseEvaluator {
 
 abstract class RepetitionEvaluator extends PoseEvaluator {
   String? update(Map<PoseLandmarkType, Offset> points);
-  
-  int get repetitionCount => 0;
+  int repetitionCount = 0;
 }

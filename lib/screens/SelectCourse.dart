@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/course_event_service.dart';
 import '../widgets/navigation_bar.dart';
 import '../widgets/thera_app_bar.dart';
+import '../widgets/exercise_preview_dialog.dart';
+
 
 class SelectCourseScreen extends StatefulWidget {
   const SelectCourseScreen({super.key});
@@ -43,29 +45,71 @@ class _SelectCourseScreenState extends State<SelectCourseScreen> {
     }
   }
 
-  void _startCourse(String exerciseName) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('คำเตือนก่อนฝึก'),
-        content: const Text(
-          'กรุณาแน่ใจว่าคุณอยู่ในพื้นที่ปลอดภัย มีพื้นที่เพียงพอสำหรับการเคลื่อนไหว และไม่มีสิ่งกีดขวางรอบตัว\n\n❗หากเป็นผู้สูงอายุหรือเด็กควรมีผู้ดูแลก่อนเริ่มต้น❗ \n\n❗หากมีอาการปวดเมื่อยหรือชาให้หยุดทันที❗\n\nคุณต้องการเริ่มฝึกท่านี้หรือไม่?',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ยกเลิก')),
-          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('เริ่มฝึก')),
+ void _startCourse(String exerciseName,String slug) async {
+final imageAsset = 'assets/picture/$slug.png';
+final description = 'ตัวอย่างท่า: $exerciseName\n\nรักษาท่าทางให้ถูกต้องตลอดการฝึก';
+
+
+  final previewConfirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => ExercisePreviewDialog(
+      title: exerciseName,
+      imageAsset: imageAsset,
+      description: description,
+    ),
+  );
+
+  if (previewConfirmed != true) return;
+
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Row(
+        children: const [
+          Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+          SizedBox(width: 8),
+          Text('คำเตือนก่อนเริ่มฝึก', style: TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),
-    );
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text('โปรดตรวจสอบสิ่งต่อไปนี้ก่อนเริ่มต้น:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+            SizedBox(height: 12),
+            BulletText('📍 อยู่ในพื้นที่ที่มีพื้นที่ว่างเพียงพอสำหรับการเคลื่อนไหว'),
+            BulletText('📷 กล้องสามารถมองเห็นร่างกายของคุณได้เต็มตัว'),
+            BulletText('🚫 ไม่มีสิ่งกีดขวางรอบตัวคุณ'),
+            SizedBox(height: 12),
+            Text('⚠️ ข้อควรระวัง', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+            BulletText('👵 หากเป็นผู้สูงอายุหรือเด็ก ควรมีผู้ดูแลอยู่ด้วย'),
+            BulletText('❗ หากมีอาการปวด ชา หรือไม่สบาย ให้หยุดฝึกทันที'),
+            SizedBox(height: 8),
+            Text('คุณต้องการเริ่มฝึกท่านี้หรือไม่?', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ยกเลิก')),
+        ElevatedButton.icon(
+          icon: const Icon(Icons.play_circle_fill),
+          onPressed: () => Navigator.pop(context, true),
+          label: const Text('เริ่มฝึก'),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange, foregroundColor: Colors.white),
+        ),
+      ],
+    ),
+  );
 
-    if (confirmed == true) {
-      Navigator.pushNamed(context, '/camera', arguments: exerciseName);
-    }
+  if (confirmed == true) {
+    Navigator.pushNamed(context, '/camera', arguments: exerciseName);
   }
+}
+
 
   Widget _buildExerciseCard(Map<String, String> ex, Color color, IconData icon) {
     return GestureDetector(
-      onTap: () => _startCourse(ex['title']!),
+      onTap: () =>_startCourse(ex['title']!, ex['slug']!),
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 8),
         padding: const EdgeInsets.all(16),
@@ -132,15 +176,18 @@ class _SelectCourseScreenState extends State<SelectCourseScreen> {
     Color color;
     IconData icon;
 
-    if (name.contains('ขา')) {
+    if (name.contains('กีฬา')) {
       color = const Color(0xFF6BCB77);
-      icon = Icons.run_circle_rounded;
-    } else if (name.contains('แขน')) {
-      color = const Color(0xFFF4A261);
-      icon = Icons.fitness_center;
-    } else if (name.contains('ไหล่')) {
+      icon = Icons.directions_run;
+    } else if (name.contains('ผู้สูงอายุ')) {
       color = const Color(0xFF4CC9F0);
-      icon = Icons.accessibility_rounded;
+      icon = Icons.elderly;
+    } else if (name.contains('ระบบประสาท')) {
+      color = const Color(0xFFF4A261);
+      icon = Icons.psychology;
+    } else if (name.contains('กระดูก')) {
+      color = const Color(0xFF9D4EDD);
+      icon = Icons.accessibility_new;
     } else {
       color = Colors.grey;
       icon = Icons.self_improvement;
@@ -207,6 +254,25 @@ class _SelectCourseScreenState extends State<SelectCourseScreen> {
       bottomNavigationBar: TheraBottomNav(
         currentIndex: _navIndex,
         onTap: _onNavTapped,
+      ),
+    );
+  }
+}
+
+class BulletText extends StatelessWidget {
+  final String text;
+  const BulletText(this.text, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('• ', style: TextStyle(fontSize: 16)),
+          Expanded(child: Text(text, style: TextStyle(fontSize: 14))),
+        ],
       ),
     );
   }

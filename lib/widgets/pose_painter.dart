@@ -38,17 +38,33 @@ class PosePainter extends CustomPainter {
     [PoseLandmarkType.rightKnee, PoseLandmarkType.rightAnkle],
   ];
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    final scaleX = size.width / imageWidth;
-    final scaleY = size.height / imageHeight;
+  Offset transform(PoseLandmark lm, Size screenSize) {
+    final previewAspectRatio = imageHeight / imageWidth;
+    final screenAspectRatio = screenSize.height / screenSize.width;
 
-    Offset transform(PoseLandmark lm) {
-      final x = isFrontCamera ? (imageWidth - lm.x) * scaleX : lm.x * scaleX;
-      final y = lm.y * scaleY;
-      return Offset(x, y);
+    double scale;
+    double dx = 0, dy = 0;
+
+    if (previewAspectRatio > screenAspectRatio) {
+      // ครอบแนวตั้ง
+      scale = screenSize.height / imageHeight;
+      dx = (screenSize.width - imageWidth * scale) / 2;
+    } else {
+      // ครอบแนวนอน
+      scale = screenSize.width / imageWidth;
+      dy = (screenSize.height - imageHeight * scale) / 2;
     }
 
+    double x = lm.x * scale + dx;
+    double y = lm.y * scale + dy;
+
+    if (isFrontCamera) x = screenSize.width - x;
+
+    return Offset(x, y);
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
     final pointPaint = Paint()
       ..color = Colors.pink
       ..style = PaintingStyle.fill;
@@ -58,7 +74,7 @@ class PosePainter extends CustomPainter {
       ..strokeWidth = 3.0;
 
     final points = {
-      for (var lm in landmarks) lm.type: transform(lm),
+      for (var lm in landmarks) lm.type: transform(lm, size),
     };
 
     for (final connection in connections) {

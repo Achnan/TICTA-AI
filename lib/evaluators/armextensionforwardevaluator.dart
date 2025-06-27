@@ -1,40 +1,66 @@
-import 'dart:math';
 import 'dart:ui';
-import 'evaluator_base.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'evaluator_base.dart';
 
-class ArmExtensionForwardEvaluator extends PoseEvaluator {
-  @override
-  bool get requiresSideView => true;
-  @override
-  String get name => 'Arm Extension Forward';
+class ArmExtensionForwardEvaluator extends RepetitionEvaluator {
+  int _state = 0;
+  String _feedback = '';
 
   @override
-  String get feedback => 'เหยียดแขนและยกขึ้นเหนือศีรษะ';
+  String get name => "Arm Extension Forward";
+
+  @override
+  String get feedback => _feedback;
+
+  @override
+  String? update(Map<PoseLandmarkType, Offset> points) {
+    final rightWrist = points[PoseLandmarkType.rightWrist];
+    final rightShoulder = points[PoseLandmarkType.rightShoulder];
+
+    if (rightWrist == null || rightShoulder == null) return null;
+
+    final dy = rightShoulder.dy - rightWrist.dy;
+    final dx = (rightWrist.dx - rightShoulder.dx).abs();
+
+    if (_state == 0 && dy > 60 && dx > 50) {
+      _state = 1;
+    } else if (_state == 1 && dy < 15) {
+      _state = 0;
+      repetitionCount++;
+      _feedback = "✓ เหยียดแขนครั้งที่ $repetitionCount";
+      return _feedback;
+    }
+
+    return null;
+  }
 
   @override
   bool evaluate(Map<PoseLandmarkType, Offset> points) {
-    if (!(points.containsKey(PoseLandmarkType.leftShoulder) &&
-          points.containsKey(PoseLandmarkType.leftElbow) &&
-          points.containsKey(PoseLandmarkType.leftWrist))) return false;
+    final rightWrist = points[PoseLandmarkType.rightWrist];
+    final rightShoulder = points[PoseLandmarkType.rightShoulder];
+    if (rightWrist == null || rightShoulder == null) return false;
 
-    final angle = calculateAngle(
-      points[PoseLandmarkType.leftShoulder]!,
-      points[PoseLandmarkType.leftElbow]!,
-      points[PoseLandmarkType.leftWrist]!,
-    );
+    final dy = rightShoulder.dy - rightWrist.dy;
+    final dx = (rightWrist.dx - rightShoulder.dx).abs();
 
-    return angle > 150;
-
+    return dy > 15 && dx > 50;
   }
 
-double calculateAngle(Offset a, Offset b, Offset c) {
-  final ab = a - b;
-  final cb = c - b;
-  final dot = ab.dx * cb.dx + ab.dy * cb.dy;
-  final abLen = ab.distance;
-  final cbLen = cb.distance;
-  return acos(dot / (abLen * cbLen)) * (180 / pi);
-}
+  @override
+  String getTechnicalFeedback(Map<PoseLandmarkType, Offset> points) {
+    final rightWrist = points[PoseLandmarkType.rightWrist];
+    final rightShoulder = points[PoseLandmarkType.rightShoulder];
 
+    if (rightWrist == null || rightShoulder == null) {
+      return "กรุณาให้เห็นแขนขวาและหัวไหล่ในกล้อง";
+    }
+
+    final dy = rightShoulder.dy - rightWrist.dy;
+    final dx = (rightWrist.dx - rightShoulder.dx).abs();
+
+    if (dy <= 15) return "ยกแขนขึ้นอีกนิด";
+    if (dx <= 50) return "เหยียดแขนไปด้านหน้าให้ตรง";
+
+    return "";
+  }
 }

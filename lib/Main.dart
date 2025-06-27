@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -13,6 +14,7 @@ import 'screens/Login.dart';
 import 'screens/SelectCourse.dart';
 import 'screens/SettingsScreen.dart';
 import 'screens/SuggestionScreen.dart';
+import 'services/user_settings.dart';
 
 List<CameraDescription> cameras = [];
 
@@ -26,29 +28,41 @@ Future<void> requestNotificationPermission() async {
   }
 }
 
+// ✅ ขอ permission สำหรับโทรศัพท์
+Future<void> requestPhonePermission() async {
+  if (await Permission.phone.isDenied) {
+    await Permission.phone.request();
+  }
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('th', null);
   tz.initializeTimeZones();
   tz.setLocalLocation(tz.getLocation('Asia/Bangkok'));
+
   await requestNotificationPermission();
+  await requestPhonePermission();
+  await UserSettings.loadSettings(); 
 
   const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
   const initSettings = InitializationSettings(android: androidInit);
   await flutterLocalNotificationsPlugin.initialize(
     initSettings,
     onDidReceiveNotificationResponse: (response) {
-      debugPrint('🔔 Notification clicked: ${response.payload}');
+      debugPrint('🔔 Notification clicked: \${response.payload}');
     },
   );
 
   cameras = await availableCameras();
 
   final prefs = await SharedPreferences.getInstance();
+  final suggestionDoneRaw = prefs.get('suggestion_done');
+  final skipSuggestionRaw = prefs.get('suggestion_skip');
 
-  // ✅ เช็กสถานะคำแนะนำ
-  final bool suggestionDone = prefs.getBool('suggestion_done') ?? false;
-  final bool skipSuggestion = prefs.getBool('suggestion_skip') ?? false;
+  final bool suggestionDone = suggestionDoneRaw is bool ? suggestionDoneRaw : false;
+  final bool skipSuggestion = skipSuggestionRaw is bool ? skipSuggestionRaw : false;
+
   final initialRoute = (!suggestionDone && !skipSuggestion)
       ? '/suggestion'
       : '/select-course';
